@@ -1,33 +1,18 @@
-# Verifica se o Git está instalado
-$gitPath = Get-Command git -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Path
-$gitPathDefault = "C:\Program Files\Git\bin\git.exe"
-
-if ($gitPath -or (Test-Path $gitPathDefault)) {
-    Write-Output "Git já está instalado em: $($gitPath -or $gitPathDefault)"
-} else {
-    Write-Output "Git não está instalado. Instalando..."
-    $gitInstallerUrl = "https://github.com/git-for-windows/git/releases/latest/download/Git-x86_64.exe"
-    $gitInstallerPath = "$env:TEMP\git-installer.exe"
-    Invoke-WebRequest -Uri $gitInstallerUrl -OutFile $gitInstallerPath
-    Start-Process -FilePath $gitInstallerPath -ArgumentList '/VERYSILENT', '/NORESTART' -Wait
-    Remove-Item $gitInstallerPath
-}
-
 # Verifica se o OpenVPN está instalado
 $openvpnPath = "C:\Program Files\OpenVPN\bin\openvpn.exe"
 if (Test-Path $openvpnPath) {
-    Write-Output "OpenVPN já está instalado em: $openvpnPath"
+    Write-Output "OpenVPN ja esta instalado em: $openvpnPath"
 } else {
-    Write-Output "OpenVPN não encontrado. Baixando e instalando o OpenVPN Client..."
-    $openvpnInstallerUrl = "https://swupdate.openvpn.net/community/releases/openvpn-install-2.6.7-I601-Win10.exe"  # Atualize para a versão desejada
-    $openvpnInstallerPath = "$env:TEMP\openvpn-installer.exe"
+    Write-Output "OpenVPN nao encontrado. Baixando e instalando o OpenVPN Client..."
+    $openvpnInstallerUrl = "https://swupdate.openvpn.org/community/releases/OpenVPN-2.6.12-I001-amd64.msi"  # Atualize para a versão desejada
+    $openvpnInstallerPath = "$env:TEMP\openvpn-installer.msi"
     Invoke-WebRequest -Uri $openvpnInstallerUrl -OutFile $openvpnInstallerPath
-    Start-Process -FilePath $openvpnInstallerPath -ArgumentList '/S' -Wait
+    Start-Process msiexec.exe -ArgumentList "/i `"$openvpnInstallerPath`" /quiet /norestart" -Wait
     Remove-Item $openvpnInstallerPath
 }
 
 # Solicitar nome do certificado
-$certName = Read-Host -Prompt "Digite o nome do usuário"
+$certName = Read-Host -Prompt "Digite o nome do usuario criado no OpenVPN Manager"
 
 # URLs dos arquivos no GitHub
 $certFileUrl = "https://raw.githubusercontent.com/skittlesbr/openvpn/main/$certName.crt"
@@ -63,9 +48,9 @@ $configFilePath = "$openvpnConfigDir\windows.ovpn"
 if (Test-Path $configFilePath) {
     Add-Content -Path $configFilePath -Value "cert $certName.crt"
     Add-Content -Path $configFilePath -Value "key $certName.key"
-    Write-Output "Linhas de configuração adicionadas ao arquivo windows.ovpn"
+    Write-Output "Linhas de configuracao adicionadas ao arquivo windows.ovpn"
 } else {
-    Write-Output "Arquivo de configuração não encontrado: $configFilePath"
+    Write-Output "Arquivo de configuracao nao encontrado: $configFilePath"
 }
 
 # Configurando conexão automática no reinício
@@ -78,7 +63,7 @@ if (Test-Path $configFilePath) {
     $shortcut.WindowStyle = 7
     $shortcut.Save()
 } else {
-    Write-Output "Arquivo de configuração não encontrado: $configFilePath"
+    Write-Output "Arquivo de configuracao nao encontrado: $configFilePath"
 }
 
-Write-Output "Instalação e configuração concluídas. O OpenVPN Client será iniciado automaticamente com o sistema."
+Write-Output "Instalacao e configuracao concluidas. O OpenVPN Client sera iniciado automaticamente com o sistema. Caso nao tenha iniciado, abra o Executar e rode o seguinte comando: %APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\OpenVPN.lnk " 
