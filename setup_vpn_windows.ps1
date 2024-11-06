@@ -43,11 +43,11 @@ $certName = Read-Host -Prompt "Digite o nome do usuário criado no OpenVPN Manag
 $gitToken = Read-Host -Prompt "Digite seu token do GitHub"
 
 # URLs dos arquivos no GitHub
-$certFileUrl = "https://raw.githubusercontent.com/skittlesbr/openvpn/main/$certName.crt"
-$keyFileUrl = "https://raw.githubusercontent.com/skittlesbr/openvpn/main/$certName.key"
-$caFileUrl = "https://raw.githubusercontent.com/skittlesbr/openvpn/main/ca.crt"
-$configFileUrl = "https://raw.githubusercontent.com/skittlesbr/openvpn/main/windows.ovpn"
-$taKeyUrl = "https://raw.githubusercontent.com/skittlesbr/openvpn/main/ta.key"
+$certFileUrl = "https://raw.githubusercontent.com/skittlesbr/certs/master/$certName.crt"
+$keyFileUrl = "https://raw.githubusercontent.com/skittlesbr/certs/master/$certName.key"
+$caFileUrl = "https://raw.githubusercontent.com/skittlesbr/certs/master/ca.crt"
+$configFileUrl = "https://raw.githubusercontent.com/skittlesbr/certs/master/windows.ovpn"
+$taKeyUrl = "https://raw.githubusercontent.com/skittlesbr/certs/master/ta.key"
 
 # Função para fazer download de um arquivo específico com autenticação
 function Download-File {
