@@ -20,6 +20,6 @@ Será solicitado o usuário que irá utilizar a VPN (o mesmo que foi criado no O
 
 Após executar o script com sucesso, clicar com o botão direito do mouse no ícone do OpenVPN que fica ao lado do relógio e clicar em configurações.
 
-Deativar a opção "Executar ao iniciar o Windows".
+Desativar a opção "Executar ao iniciar o Windows".
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------
