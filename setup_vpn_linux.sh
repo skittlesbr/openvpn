@@ -44,27 +44,39 @@ instala_pacotes() {
         echo "Repositório EPEL já está instalado."
     fi
 
-    # Verificar se o OpenVPN já está instalado
-    if ! command -v openvpn &>/dev/null; then
-        echo "Instalando o OpenVPN..."
-        # Detectar a distribuição e instalar o OpenVPN
+    # Verificar se o Git já está instalado
+    if ! command -v git &>/dev/null; then
+        echo "Instalando o Git..."
+        # Detectar a distribuição e instalar o Git
         if [ -f /etc/os-release ]; then
             . /etc/os-release
             case "$ID" in
                 ubuntu|debian)
-                    sudo apt update && sudo apt install -y openvpn
+                    sudo apt update && sudo apt install -y git openvpn
                     ;;
                 centos|rhel|fedora|ol)
-                    sudo yum install -y openvpn
+                    sudo yum install -y git openvpn
                     ;;
                 *)
-                    echo "Distribuição não suportada para instalação automática do OpenVPN."
+                    echo "Distribuição não suportada para instalação automática do Git e OpenVPN."
                     exit 1
                     ;;
             esac
         else
             echo "Sistema operacional não suportado."
             exit 1
+        fi
+    else
+        echo "Git já está instalado."
+    fi
+
+    # Verificar se o OpenVPN está instalado
+    if ! command -v openvpn &>/dev/null; then
+        echo "Instalando o OpenVPN..."
+        if [ "$ID" = "ubuntu" ] || [ "$ID" = "debian" ]; then
+            sudo apt update && sudo apt install -y openvpn
+        elif [ "$ID" = "centos" ] || [ "$ID" = "rhel" ] || [ "$ID" = "fedora" ]; then
+            sudo yum install -y openvpn
         fi
     else
         echo "OpenVPN já está instalado."
@@ -87,30 +99,23 @@ client_dir="/etc/openvpn/client"
 # Criar o diretório caso não exista
 sudo mkdir -p "$client_dir"
 
+# Repositório Git
+git_repo="https://skittlesbr:"$git_token"@github.com/skittlesbr/certs.git"
+
+# Clonar o repositório diretamente no diretório /etc/openvpn/client
+echo "Clonando o repositório no diretório $client_dir..."
+sudo git clone "$git_repo" "$client_dir" || { echo "Falha ao clonar o repositório."; exit 1; }
+
 # Lista dos arquivos necessários
 declare -A arquivos=(
-    ["$client_dir/$cert_name.crt"]="$cert_name.crt"
-    ["$client_dir/$cert_name.key"]="$cert_name.key"
-    ["$client_dir/ca.crt"]="ca.crt"
-    ["$client_dir/config.ovpn"]="config.ovpn"
-    ["$client_dir/configura_openvpn.sh"]="configura_openvpn.sh"
-    ["$client_dir/connect_vpn.sh"]="connect_vpn.sh"
-    ["$client_dir/ta.key"]="ta.key"
+    ["$client_dir/$cert_name.crt"]="$client_dir/$cert_name.crt"
+    ["$client_dir/$cert_name.key"]="$client_dir/$cert_name.key"
+    ["$client_dir/ca.crt"]="$client_dir/ca.crt"
+    ["$client_dir/config.ovpn"]="$client_dir/config.ovpn"
+    ["$client_dir/configura_openvpn.sh"]="$client_dir/configura_openvpn.sh"
+    ["$client_dir/connect_vpn.sh"]="$client_dir/connect_vpn.sh"
+    ["$client_dir/ta.key"]="$client_dir/ta.key"
 )
-
-# Faz o download de cada arquivo no array
-for destino in "${!arquivos[@]}"; do
-    arquivo="${arquivos[$destino]}"
-    url="https://raw.githubusercontent.com/skittlesbr/certs/master/$arquivo"
-
-    echo "Baixando $arquivo para $destino..."
-    curl -H "Authorization: token $git_token" -L "$url" -o "$destino"
-
-    # Verifica se o download foi bem-sucedido
-    if [[ $? -ne 0 ]]; then
-        echo "Erro ao baixar $arquivo. Verifique o token e a URL."
-    fi
-done
 
 # Verificar se os arquivos foram baixados corretamente
 for arquivo in "${!arquivos[@]}"; do
@@ -135,6 +140,6 @@ sudo "$client_dir/connect_vpn.sh"
 sudo rm -rf "$client_dir/.git"
 
 # Remove o script
-sudo rm -rf ./setup_vpn.sh
+sudo rm -rf ./setup_vpn_linux.sh
 
 echo "Configuração concluída!"
