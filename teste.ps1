@@ -61,6 +61,7 @@ function Download-FileFromGitHub {
         } else {
             Write-Error "Erro ao tentar acessar o arquivo $fileName. Detalhes: $($_.Exception.Message)"
         }
+        Pause
         exit 1
     }
 }
