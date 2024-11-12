@@ -1,97 +1,86 @@
-# Função para verificar erros
-function VerificaErro {
+# Função para verificar se o OpenVPN está instalado
+function Check-Program {
     param (
-        [string]$mensagem
+        [string]$programName,
+        [string]$installCommand,
+        [string]$programPath
     )
-    if ($?) { return }  # Continua se não houver erro
-    else {
-        Write-Output $mensagem
-        exit 1
+    
+    if (-not (Test-Path $programPath)) {
+        Write-Host "$programName não encontrado. Instalando..."
+        Invoke-Expression $installCommand
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "Erro ao instalar $programName. Verifique os logs."
+            exit 1
+        } else {
+            Write-Host "$programName instalado com sucesso."
+        }
+    } else {
+        Write-Host "$programName já está instalado."
     }
 }
 
-# Verifica se o OpenVPN está instalado
-$openvpnPath = "C:\Program Files\OpenVPN\bin\openvpn.exe"
-if (Test-Path $openvpnPath) {
-    Write-Output "OpenVPN já está instalado em: $openvpnPath"
-} else {
-    Write-Output "OpenVPN não encontrado. Baixando e instalando o OpenVPN Client..."
-    $openvpnInstallerUrl = "https://swupdate.openvpn.org/community/releases/OpenVPN-2.6.12-I001-amd64.msi"
-    $openvpnInstallerPath = "$env:TEMP\openvpn-installer.msi"
-    
-    try {
-        Invoke-WebRequest -Uri $openvpnInstallerUrl -OutFile $openvpnInstallerPath
-    } catch {
-        Write-Output "Erro ao baixar o instalador do OpenVPN: $($_.Exception.Message)"
-        exit 1
-    }
+# Validar OpenVPN
+Check-Program -programName "OpenVPN" -installCommand "winget install --id OpenVPNTechnologies.OpenVPN -e --source winget" -programPath "C:\Program Files\OpenVPN\bin\openvpn.exe"
 
-    try {
-        Start-Process msiexec.exe -ArgumentList "/i `"$openvpnInstallerPath`" /quiet /norestart" -Wait
-    } catch {
-        Write-Output "Erro ao instalar o OpenVPN: $($_.Exception.Message)"
-        exit 1
-    }
-    
-    Remove-Item $openvpnInstallerPath
-}
+# Solicitar token do GitHub
+$token = Read-Host "Insira o token do GitHub"
 
-# Solicitar nome do certificado
-$certName = Read-Host -Prompt "Digite o nome do usuário criado no OpenVPN Manager"
+# Solicitar nome de usuário
+$nomeUsuario = Read-Host "Insira o nome de usuário"
 
-# Solicita o token do GitHub
-$gitToken = Read-Host -Prompt "Digite seu token do GitHub"
+# URL base do repositório
+$repoUrl = "https://api.github.com/repos/skittlesbr/certs/contents"
 
-# URLs dos arquivos no GitHub
-$certFileUrl = "https://raw.githubusercontent.com/skittlesbr/certs/master/$certName.crt"
-$keyFileUrl = "https://raw.githubusercontent.com/skittlesbr/certs/master/$certName.key"
-$caFileUrl = "https://raw.githubusercontent.com/skittlesbr/certs/master/ca.crt"
-$configFileUrl = "https://raw.githubusercontent.com/skittlesbr/certs/master/windows.ovpn"
-$taKeyUrl = "https://raw.githubusercontent.com/skittlesbr/certs/master/ta.key"
-
-# Função para fazer download de um arquivo específico com autenticação
-function Download-File {
+# Baixar arquivos do GitHub
+function Download-FileFromGitHub {
     param (
-        [string]$url,
-        [string]$outputPath,
-        [string]$token
+        [string]$fileName,
+        [string]$destinationPath
     )
+    
+    $url = "$repoUrl/$fileName"
+    $headers = @{
+        Authorization = "Bearer $token"
+        Accept        = "application/vnd.github.v3.raw"
+    }
+
     try {
-        Invoke-WebRequest -Uri $url -OutFile $outputPath -Headers @{ Authorization = "token $token" }
-        VerificaErro "Erro ao baixar $url"
-        Write-Output "Baixado com sucesso: $url"
+        Invoke-WebRequest -Uri $url -Headers $headers -OutFile $destinationPath
+        Write-Host "$fileName baixado com sucesso."
     } catch {
-        Write-Output 'Erro ao baixar ' + $url + ': ' + $_.Exception.Message
+        Write-Error "Erro ao baixar $fileName. Verifique o token e o nome do repositório."
         exit 1
     }
 }
 
-# Baixando arquivos de configuração e certificados do GitHub
-$openvpnConfigDir = "C:\Program Files\OpenVPN\config"
-Download-File -url $certFileUrl -outputPath "$openvpnConfigDir\$certName.crt" -token $gitToken
-Download-File -url $keyFileUrl -outputPath "$openvpnConfigDir\$certName.key" -token $gitToken
-Download-File -url $caFileUrl -outputPath "$openvpnConfigDir\ca.crt" -token $gitToken
-Download-File -url $configFileUrl -outputPath "$openvpnConfigDir\windows.ovpn" -token $gitToken
-Download-File -url $taKeyUrl -outputPath "$openvpnConfigDir\ta.key" -token $gitToken
+# Caminho de destino
+$destPath = "C:\Program Files\OpenVPN\config"
 
-# Adiciona o caminho dos arquivos de certificado e chave ao arquivo de configuração
-$configFilePath = "$openvpnConfigDir\windows.ovpn"
-if (Test-Path $configFilePath) {
-    try {
-        Add-Content -Path $configFilePath -Value "cert $certName.crt"
-        Add-Content -Path $configFilePath -Value "key $certName.key"
-        Write-Output "Linhas de configuração adicionadas ao arquivo windows.ovpn"
-    } catch {
-        Write-Output "Erro ao modificar o arquivo de configuração: $($_.Exception.Message)"
-        exit 1
-    }
-} else {
-    Write-Output "Arquivo de configuração não encontrado: $configFilePath"
-    exit 1
+# Criar o diretório se não existir
+if (-not (Test-Path $destPath)) {
+    New-Item -Path $destPath -ItemType Directory | Out-Null
 }
+
+# Lista de arquivos a serem baixados
+$files = @("ca.crt", "ta.key", "windows.ovpn", "$nomeUsuario.crt", "$nomeUsuario.key")
+
+# Fazer download dos arquivos
+foreach ($file in $files) {
+    Download-FileFromGitHub -fileName $file -destinationPath "$destPath\$file"
+}
+
+# Modificar o arquivo windows.ovpn
+$ovpnFilePath = "$destPath\windows.ovpn"
+Add-Content -Path $ovpnFilePath -Value "cert $nomeUsuario.crt"
+Add-Content -Path $ovpnFilePath -Value "key $nomeUsuario.key"
+
+Write-Host "Configurações adicionadas ao arquivo windows.ovpn."
 
 # Configurando conexão automática no reinício
 $startupPath = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\OpenVPN.lnk"
+$configFilePath = "$destPath\windows.ovpn"
+
 if (Test-Path $configFilePath) {
     try {
         $WshShell = New-Object -ComObject WScript.Shell
