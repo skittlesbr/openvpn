@@ -46,7 +46,7 @@ instala_pacotes() {
 
     # Verificar se o OpenVPN está instalado
     if ! command -v openvpn &>/dev/null; then
-        echo "Instalando o OpenVPN..."
+        echo "OpenVPN não encontrado. Instalando o OpenVPN..."
         if [ "$ID" = "ubuntu" ] || [ "$ID" = "debian" ]; then
             sudo apt update && sudo apt install -y openvpn
         elif [ "$ID" = "centos" ] || [ "$ID" = "rhel" ] || [ "$ID" = "fedora" ] || [ "$ID" = "ol" ] || [ "$ID" = "rocky" ]; then
@@ -83,6 +83,14 @@ Download_FileFromGitHub() {
 # Executa a função para instalar os pacotes
 instala_pacotes
 
+# Validar se o OpenVPN foi instalado corretamente após a execução da função
+if ! command -v openvpn &>/dev/null; then
+    echo "Falha ao instalar o OpenVPN. Abortando a execução."
+    exit 1
+else
+    echo "OpenVPN instalado com sucesso."
+fi
+
 # Solicitar o nome do certificado ao usuário
 read -p "Digite o nome do usuário: " cert_name
 
@@ -97,7 +105,7 @@ client_dir="/etc/openvpn/client"
 sudo mkdir -p "$client_dir"
 
 # Lista dos arquivos necessários
-arquivos=("ca.crt" "config.ovpn" "ta.key" "$cert_name.crt" "$cert_name.key")
+arquivos=("ca.crt" "config.ovpn" "ta.key" "$cert_name.crt" "$cert_name.key" "configura_openvpn.sh" "connect_vpn.sh")
 
 # Baixar os arquivos do repositório
 for file in "${arquivos[@]}"; do
@@ -125,6 +133,6 @@ echo "Conectando à VPN..."
 sudo "$client_dir/connect_vpn.sh"
 
 # Remove o script
-sudo rm -rf ./setup_vpn_linux.sh
+sudo rm -rf ./teste.sh
 
 echo "Configuração concluída!"
