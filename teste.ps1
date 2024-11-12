@@ -61,7 +61,6 @@ function Download-FileFromGitHub {
         } else {
             Write-Error "Erro ao tentar acessar o arquivo $fileName. Detalhes: $($_.Exception.Message)"
         }
-        Pause
         exit 1
     }
 }
@@ -126,3 +125,7 @@ if (Test-Path $startupPath) {
 }
 
 Write-Output "Instalação e configuração concluídas. O OpenVPN Client será iniciado automaticamente com o sistema. Caso não tenha iniciado, abra o Executar e rode o seguinte comando: %APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\OpenVPN.lnk"
+
+# Adicionando linha para evitar o fechamento da janela do PowerShell
+Write-Host "Pressione Enter para sair."
+Read-Host
