@@ -57,7 +57,7 @@ instala_pacotes() {
     fi
 }
 
-# Função para baixar arquivos do GitHub usando curl
+# Função para baixar arquivos do GitHub usando curl com verificação de existência
 Download_FileFromGitHub() {
     local fileName="$1"
     local destinationPath="$2"
@@ -66,16 +66,27 @@ Download_FileFromGitHub() {
     # URL base do repositório (ajuste conforme necessário)
     local repoUrl="https://api.github.com/repos/skittlesbr/certs/contents/$fileName"
 
-    # Baixar o arquivo
-    curl -H "Authorization: Bearer $token" \
-         -H "Accept: application/vnd.github.v3.raw" \
-         -o "$destinationPath" \
-         "$repoUrl"
+    # Verificar se o arquivo existe no repositório
+    response=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $token" "$repoUrl")
 
-    if [[ $? -eq 0 ]]; then
-        echo "$fileName baixado com sucesso."
+    if [[ "$response" -eq 404 ]]; then
+        echo "Erro: O arquivo $fileName não foi encontrado no repositório."
+        exit 1
+    elif [[ "$response" -eq 200 ]]; then
+        # Baixar o arquivo se ele existir
+        curl -H "Authorization: Bearer $token" \
+             -H "Accept: application/vnd.github.v3.raw" \
+             -o "$destinationPath" \
+             "$repoUrl"
+
+        if [[ $? -eq 0 ]]; then
+            echo "$fileName baixado com sucesso."
+        else
+            echo "Erro ao baixar $fileName. Verifique o token e o nome do repositório."
+            exit 1
+        fi
     else
-        echo "Erro ao baixar $fileName. Verifique o token e o nome do repositório."
+        echo "Erro: Não foi possível acessar o arquivo $fileName. Código de resposta HTTP: $response."
         exit 1
     fi
 }
