@@ -61,6 +61,9 @@ function Download-FileFromGitHub {
         } else {
             Write-Error "Erro ao tentar acessar o arquivo $fileName. Detalhes: $($_.Exception.Message)"
         }
+        # Adicionando linha para evitar o fechamento da janela do PowerShell
+        Write-Host "Pressione Enter para sair."
+        Read-Host
         exit 1
     }
 }
