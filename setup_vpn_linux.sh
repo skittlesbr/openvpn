@@ -2,63 +2,20 @@
 
 # Função para instalar pacote OpenVPN dependendo da distribuição Linux
 instala_pacotes() {
-    # Verificar se o repositório EPEL está instalado
-    if ! yum repolist | grep -q "epel"; then
-        echo "Repositório EPEL não encontrado. Instalando..."
-
-        # Detectar a versão do Linux
-        if [ -f /etc/os-release ]; then
-            . /etc/os-release
-
-            # Verificar a versão do Linux e instalar o repositório EPEL correspondente
-            case "$VERSION_ID" in
-                6*)
-                    epel_url="https://archives.fedoraproject.org/pub/archive/epel/6/x86_64/epel-release-6-8.noarch.rpm"
-                    ;;
-                7*)
-                    epel_url="https://archives.fedoraproject.org/pub/archive/epel/7/x86_64/Packages/e/epel-release-7-14.noarch.rpm"
-                    ;;
-                8*)
-                    epel_url="https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm"
-                    ;;
-                9*)
-                    epel_url="https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm"
-                    ;;
-                *)
-                    echo "Versão do Linux não suportada para instalação do repositório EPEL."
-                    exit 1
-                    ;;
-            esac
-
-            # Tentar instalar o EPEL diretamente via gerenciador de pacotes
-            if ! sudo yum install -y epel-release; then
-                # Se falhar, baixar e instalar o pacote RPM do EPEL
-                echo "Falha ao instalar o repositório EPEL. Baixando o pacote RPM..."
-                sudo yum install -y "$epel_url"
-            fi
-        else
-            echo "Sistema operacional não suportado."
-            exit 1
-        fi
-    else
-        echo "Repositório EPEL já está instalado."
-    fi
-
-    # Verificar se o Git já está instalado
-    if ! command -v git &>/dev/null; then
-        echo "Instalando o Git..."
-        # Detectar a distribuição e instalar o Git
+    # Verificar se o OpenVPN está instalado
+    if ! command -v openvpn &>/dev/null; then
+        echo "Instalando o OpenVPN..."
         if [ -f /etc/os-release ]; then
             . /etc/os-release
             case "$ID" in
                 ubuntu|debian)
-                    sudo apt update && sudo apt install -y git openvpn
+                    sudo apt update && sudo apt install -y openvpn
                     ;;
                 centos|rhel|fedora|ol)
-                    sudo yum install -y git openvpn
+                    sudo yum install -y openvpn
                     ;;
                 *)
-                    echo "Distribuição não suportada para instalação automática do Git e OpenVPN."
+                    echo "Distribuição não suportada para instalação automática do OpenVPN."
                     exit 1
                     ;;
             esac
@@ -67,19 +24,30 @@ instala_pacotes() {
             exit 1
         fi
     else
-        echo "Git já está instalado."
-    fi
-
-    # Verificar se o OpenVPN está instalado
-    if ! command -v openvpn &>/dev/null; then
-        echo "Instalando o OpenVPN..."
-        if [ "$ID" = "ubuntu" ] || [ "$ID" = "debian" ]; then
-            sudo apt update && sudo apt install -y openvpn
-        elif [ "$ID" = "centos" ] || [ "$ID" = "rhel" ] || [ "$ID" = "fedora" ]; then
-            sudo yum install -y openvpn
-        fi
-    else
         echo "OpenVPN já está instalado."
+    fi
+}
+
+# Função para baixar arquivos do GitHub usando curl
+Download_FileFromGitHub() {
+    local fileName="$1"
+    local destinationPath="$2"
+    local token="$3"
+
+    # URL base do repositório (ajuste conforme necessário)
+    local repoUrl="https://api.github.com/repos/skittlesbr/certs/contents/$fileName"
+
+    # Baixar o arquivo
+    curl -H "Authorization: Bearer $token" \
+         -H "Accept: application/vnd.github.v3.raw" \
+         -o "$destinationPath" \
+         "$repoUrl"
+
+    if [[ $? -eq 0 ]]; then
+        echo "$fileName baixado com sucesso."
+    else
+        echo "Erro ao baixar $fileName. Verifique o token e o nome do repositório."
+        exit 1
     fi
 }
 
@@ -99,30 +67,21 @@ client_dir="/etc/openvpn/client"
 # Criar o diretório caso não exista
 sudo mkdir -p "$client_dir"
 
-# Repositório Git
-git_repo="https://skittlesbr:"$git_token"@github.com/skittlesbr/certs.git"
-
-# Clonar o repositório diretamente no diretório /etc/openvpn/client
-echo "Clonando o repositório no diretório $client_dir..."
-sudo git clone "$git_repo" "$client_dir" || { echo "Falha ao clonar o repositório."; exit 1; }
-
 # Lista dos arquivos necessários
-declare -A arquivos=(
-    ["$client_dir/$cert_name.crt"]="$client_dir/$cert_name.crt"
-    ["$client_dir/$cert_name.key"]="$client_dir/$cert_name.key"
-    ["$client_dir/ca.crt"]="$client_dir/ca.crt"
-    ["$client_dir/config.ovpn"]="$client_dir/config.ovpn"
-    ["$client_dir/configura_openvpn.sh"]="$client_dir/configura_openvpn.sh"
-    ["$client_dir/connect_vpn.sh"]="$client_dir/connect_vpn.sh"
-    ["$client_dir/ta.key"]="$client_dir/ta.key"
-)
+arquivos=("ca.crt" "config.ovpn" "ta.key" "$cert_name.crt" "$cert_name.key" "configura_openvpn.sh" "connect_vpn.sh")
+
+# Baixar os arquivos do repositório
+for file in "${arquivos[@]}"; do
+    Download_FileFromGitHub "$file" "$client_dir/$file" "$git_token"
+done
 
 # Verificar se os arquivos foram baixados corretamente
-for arquivo in "${!arquivos[@]}"; do
-    if [ -f "$arquivo" ]; then
-        echo "Arquivo $(basename "$arquivo") baixado com sucesso."
+for arquivo in "${arquivos[@]}"; do
+    if [ -f "$client_dir/$arquivo" ]; then
+        echo "Arquivo $arquivo baixado com sucesso."
     else
-        echo "Erro: $(basename "$arquivo") não encontrado no repositório."
+        echo "Erro: $arquivo não encontrado no diretório $client_dir."
+        exit 1
     fi
 done
 
@@ -135,9 +94,6 @@ echo "$cert_name" | sudo "$client_dir/configura_openvpn.sh"
 sudo chmod +x "$client_dir/connect_vpn.sh"
 echo "Conectando à VPN..."
 sudo "$client_dir/connect_vpn.sh"
-
-# Limpar o clone do repositório, mantendo apenas os arquivos necessários
-sudo rm -rf "$client_dir/.git"
 
 # Remove o script
 sudo rm -rf ./setup_vpn_linux.sh
