@@ -32,24 +32,38 @@ $nomeUsuario = Read-Host "Insira o nome de usuário"
 # URL base do repositório
 $repoUrl = "https://api.github.com/repos/skittlesbr/certs/contents"
 
-# Baixar arquivos do GitHub
+# Função para baixar arquivos do GitHub com verificação de existência
 function Download-FileFromGitHub {
     param (
         [string]$fileName,
-        [string]$destinationPath
+        [string]$destinationPath,
+        [string]$token
     )
-    
-    $url = "$repoUrl/$fileName"
+
+    # URL da API do GitHub para verificar a existência do arquivo
+    $fileUrl = "$repoUrl/$fileName"
     $headers = @{
         Authorization = "Bearer $token"
         Accept        = "application/vnd.github.v3.raw"
     }
 
     try {
-        Invoke-WebRequest -Uri $url -Headers $headers -OutFile $destinationPath
+        # Verificar se o arquivo existe no repositório
+        $response = Invoke-RestMethod -Uri $fileUrl -Headers $headers -Method Get -ErrorAction Stop
+
+        # Se o arquivo existir, faz o download
+        Invoke-WebRequest -Uri $fileUrl -Headers $headers -OutFile $destinationPath
         Write-Host "$fileName baixado com sucesso."
     } catch {
-        Write-Error "Erro ao baixar $fileName. Verifique o token e o nome do repositório."
+        # Se o arquivo não for encontrado (erro 404), exibe mensagem de erro
+        if ($_.Exception.Response.StatusCode -eq 404) {
+            Write-Error "Erro: O arquivo $fileName não foi encontrado no repositório."
+        } else {
+            Write-Error "Erro ao tentar acessar o arquivo $fileName. Detalhes: $($_.Exception.Message)"
+        }
+        # Adicionando linha para evitar o fechamento da janela do PowerShell
+        Write-Host "Pressione Enter para sair."
+        Read-Host
         exit 1
     }
 }
@@ -67,7 +81,7 @@ $files = @("ca.crt", "ta.key", "windows.ovpn", "$nomeUsuario.crt", "$nomeUsuario
 
 # Fazer download dos arquivos
 foreach ($file in $files) {
-    Download-FileFromGitHub -fileName $file -destinationPath "$destPath\$file"
+    Download-FileFromGitHub -fileName $file -destinationPath "$destPath\$file" -token $token
 }
 
 # Modificar o arquivo windows.ovpn
