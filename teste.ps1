@@ -41,7 +41,7 @@ function Download-FileFromGitHub {
     )
 
     # URL da API do GitHub para verificar a existência do arquivo
-    $repoUrl = "https://api.github.com/repos/skittlesbr/certs/contents/$fileName"
+    $fileUrl = "$repoUrl/$fileName"
     $headers = @{
         Authorization = "Bearer $token"
         Accept        = "application/vnd.github.v3.raw"
@@ -49,10 +49,10 @@ function Download-FileFromGitHub {
 
     try {
         # Verificar se o arquivo existe no repositório
-        $response = Invoke-RestMethod -Uri $repoUrl -Headers $headers -Method Get -ErrorAction Stop
+        $response = Invoke-RestMethod -Uri $fileUrl -Headers $headers -Method Get -ErrorAction Stop
 
         # Se o arquivo existir, faz o download
-        Invoke-WebRequest -Uri $repoUrl -Headers $headers -OutFile $destinationPath
+        Invoke-WebRequest -Uri $fileUrl -Headers $headers -OutFile $destinationPath
         Write-Host "$fileName baixado com sucesso."
     } catch {
         # Se o arquivo não for encontrado (erro 404), exibe mensagem de erro
@@ -78,7 +78,7 @@ $files = @("ca.crt", "ta.key", "windows.ovpn", "$nomeUsuario.crt", "$nomeUsuario
 
 # Fazer download dos arquivos
 foreach ($file in $files) {
-    Download-FileFromGitHub -fileName $file -destinationPath "$destPath\$file"
+    Download-FileFromGitHub -fileName $file -destinationPath "$destPath\$file" -token $token
 }
 
 # Modificar o arquivo windows.ovpn
