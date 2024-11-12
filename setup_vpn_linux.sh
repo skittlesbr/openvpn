@@ -11,7 +11,7 @@ instala_pacotes() {
                 ubuntu|debian)
                     sudo apt update && sudo apt install -y openvpn
                     ;;
-                centos|rhel|fedora|ol)
+                centos|rhel|fedora|ol|rocky)
                     sudo yum install -y openvpn
                     ;;
                 *)
