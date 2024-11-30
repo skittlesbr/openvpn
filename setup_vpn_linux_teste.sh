@@ -8,7 +8,7 @@ instala_pacotes() {
 
         # Verificar o ID da distribuição
         case "$ID" in
-        ubuntu | debian)
+        ubuntu | debian | raspbian)
             echo "Sistema baseado em Debian detectado. Pulando a instalação do EPEL."
             ;;
         centos | rhel | fedora | ol | rocky | almalinux)
@@ -57,7 +57,7 @@ instala_pacotes() {
     # Verificar se o OpenVPN está instalado
     if ! command -v openvpn &>/dev/null; then
         echo "OpenVPN não encontrado. Instalando o OpenVPN..."
-        if [ "$ID" = "ubuntu" ] || [ "$ID" = "debian" ]; then
+        if [ "$ID" = "ubuntu" ] || [ "$ID" = "debian" ] || [ "$ID" = "raspbian" ]; then
             sudo apt update && sudo apt install -y openvpn
         elif [ "$ID" = "centos" ] || [ "$ID" = "rhel" ] || [ "$ID" = "fedora" ] || [ "$ID" = "ol" ] || [ "$ID" = "rocky" ] || [ "$ID" = "almalinux" ]; then
             sudo yum install -y openvpn
