@@ -81,10 +81,20 @@ baixar_aplicacao_zip() {
 
     unzip -o "$ZIP_FILE" -d /tmp/
 
-    cp -r /tmp/$(basename "$REPO_URL")-${BRANCH}/* "$APP_DIR"/
+    # Detecta automaticamente o nome do diretório extraído
+    DIR_EXTRAIDO=$(find /tmp -maxdepth 1 -type d -name "skittlesbr-relatorio-*")
 
-    rm -rf "$ZIP_FILE" "/tmp/$(basename "$REPO_URL")-${BRANCH}"
-    echo "✅ Aplicação salva em $APP_DIR"
+    if [ -d "$DIR_EXTRAIDO" ]; then
+        cp -r "$DIR_EXTRAIDO"/* "$APP_DIR"/
+        echo "✅ Aplicação salva em $APP_DIR"
+    else
+        echo "❌ Erro: diretório extraído não encontrado em /tmp."
+        exit 1
+    fi
+
+    # Limpa arquivos temporários
+    rm -f "$ZIP_FILE"
+    rm -rf "$DIR_EXTRAIDO"
 }
 
 configurar_logs_cron() {
