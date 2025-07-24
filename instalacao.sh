@@ -81,11 +81,9 @@ baixar_aplicacao_zip() {
 
     unzip -o "$ZIP_FILE" -d /tmp/
 
-    # Encontra diretório extraído (nomeado dinamicamente)
-    EXTRAIDO=$(find /tmp -maxdepth 1 -type d -name "usuario-repositorio-flask-*")
-    cp -r "$EXTRAIDO"/* "$APP_DIR"/
+    cp -r /tmp/$(basename "$REPO_URL")-${BRANCH}/* "$APP_DIR"/
 
-    rm -rf "$ZIP_FILE" "$EXTRAIDO"
+    rm -rf "$ZIP_FILE" "/tmp/$(basename "$REPO_URL")-${BRANCH}"
     echo "✅ Aplicação salva em $APP_DIR"
 }
 
