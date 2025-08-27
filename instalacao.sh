@@ -125,42 +125,33 @@ EOF
     systemctl restart rsyslog
 }
 
-configurar_logs_cron() {
-    echo "⚙️  Configurando script de logs..."
-
-    if [ -f "$SCRIPT_LOG" ]; then
-        chmod +x "$SCRIPT_LOG"
-        echo "✅ Permissões ajustadas: $SCRIPT_LOG"
-    else
-        echo "⚠️  Script $SCRIPT_LOG não encontrado. Crie o script antes de executar novamente."
-        return
+configurar_todos_crons() {
+    echo "⚙️  Configurando todas as entradas do crontab..."
+    
+    # Criar arquivo temporário
+    temp_cron=$(mktemp)
+    
+    # Inicializar crontab (pegar existente ou criar novo)
+    crontab -l 2>/dev/null > "$temp_cron" 2>/dev/null || echo "# Crontab inicializado" > "$temp_cron"
+    
+    # Adicionar entrada do logs.sh se não existir
+    if ! grep -q "$SCRIPT_LOG" "$temp_cron" 2>/dev/null && [ -f "$SCRIPT_LOG" ]; then
+        echo "$CRON_ENTRY" >> "$temp_cron"
+        echo "✅ Entrada adicionada: $CRON_ENTRY"
     fi
-
-    # Verifica se já existe no crontab
-    if crontab -l 2>/dev/null | grep -qF "$SCRIPT_LOG"; then
-        echo "⏱️  Entrada do crontab já existe. Nenhuma duplicação foi feita."
-    else
-        (crontab -l 2>/dev/null; echo "$CRON_ENTRY") | crontab -
-        echo "✅ Entrada adicionada ao crontab: $CRON_ENTRY"
+    
+    # Adicionar entrada do importa_logs.py se não existir
+    if ! grep -q "importa_logs.py" "$temp_cron" 2>/dev/null && [ -f "$APP_DIR/importa_logs.py" ]; then
+        echo "$CRON_IMPORTA_ENTRY" >> "$temp_cron"
+        echo "✅ Entrada adicionada: $CRON_IMPORTA_ENTRY"
     fi
-}
-
-configurar_importa_logs_cron() {
-    echo "⚙️  Configurando crontab para importa_logs.py..."
-
-    # Verifica se o arquivo importa_logs.py existe
-    if [ ! -f "$APP_DIR/importa_logs.py" ]; then
-        echo "⚠️  Arquivo $APP_DIR/importa_logs.py não encontrado. Pulando configuração do cron."
-        return
-    fi
-
-    # Verifica se já existe no crontab
-    if crontab -l 2>/dev/null | grep -qF "importa_logs.py"; then
-        echo "⏱️  Entrada do crontab para importa_logs.py já existe. Nenhuma duplicação foi feita."
-    else
-        (crontab -l 2>/dev/null; echo "$CRON_IMPORTA_ENTRY") | crontab -
-        echo "✅ Entrada adicionada ao crontab: $CRON_IMPORTA_ENTRY"
-    fi
+    
+    # Aplicar novo crontab
+    crontab "$temp_cron"
+    rm -f "$temp_cron"
+    
+    echo "🔍 Crontab final:"
+    crontab -l 2>/dev/null | cat -n
 }
 
 criar_banco_dados() {
@@ -218,8 +209,7 @@ instalar_pacotes
 baixar_aplicacao_zip        # ← PRIMEIRO: Baixa aplicação (com requirements.txt)
 criar_venv_instalar_dependencias  # ← DEPOIS: Instala dependências
 configurar_rsyslog
-configurar_logs_cron
-configurar_importa_logs_cron
+configurar_todos_crons
 criar_banco_dados
 criar_servico_systemd
 
