@@ -13,6 +13,7 @@ RSYSLOG_CONF="/etc/rsyslog.d/remote.conf"
 SCRIPT_LOG="/relatorio_vpn/logs.sh"
 CRON_ENTRY="*/5 * * * * $SCRIPT_LOG"
 CRON_IMPORTA_ENTRY="* * * * * $VENV_DIR/bin/python3 $APP_DIR/importa_logs.py >> /var/log/importa_logs.log 2>&1"
+APPARMOR_RSYSLOG="/etc/apparmor.d/usr.sbin.rsyslogd"
 
 # === SOLICITAR TOKEN ===
 read -p "Digite seu token de acesso pessoal do GitHub: " GITHUB_TOKEN
@@ -35,7 +36,7 @@ instalar_pacotes() {
 }
 
 baixar_aplicacao_zip() {
-    echo "⬇️  Baixando e extraindo aplicação Relatório Web do GitHub privado..."
+    echo "⬇️  Baixando e extraizando aplicação Relatório Web do GitHub privado..."
 
     mkdir -p "$APP_DIR"
     curl -L -H "Authorization: token $GITHUB_TOKEN" \
@@ -89,6 +90,39 @@ criar_venv_instalar_dependencias() {
     deactivate
     
     echo "✅ Todas as dependências instaladas no ambiente virtual $VENV_DIR"
+}
+
+configurar_apparmor_rsyslog() {
+    echo "🛡️  Verificando AppArmor para rsyslog..."
+    
+    # Verifica se AppArmor está instalado e o perfil do rsyslog existe
+    if command -v apparmor_parser >/dev/null 2>&1 && [ -f "$APPARMOR_RSYSLOG" ]; then
+        echo "✅ AppArmor encontrado. Configurando permissões para /syslog/"
+        
+        # Faz backup do perfil original
+        cp "$APPARMOR_RSYSLOG" "$APPARMOR_RSYSLOG.backup.$(date +%Y%m%d_%H%M%S)"
+        echo "📦 Backup do perfil criado: $APPARMOR_RSYSLOG.backup.$(date +%Y%m%d_%H%M%S)"
+        
+        # Verifica se as permissões já existem
+        if grep -q "/syslog/.*rw" "$APPARMOR_RSYSLOG"; then
+            echo "✅ Permissões do /syslog/ já estão configuradas no AppArmor."
+        else
+            # Adiciona as permissões necessárias
+            sed -i '/\/var\/log\/\*\* rw,/a \  /syslog/ rw,\n  /syslog/** rw,' "$APPARMOR_RSYSLOG"
+            echo "✅ Permissões adicionadas ao perfil do AppArmor."
+        fi
+        
+        # Recarrega o perfil do AppArmor
+        echo "🔄 Recarregando perfil do AppArmor..."
+        apparmor_parser -r "$APPARMOR_RSYSLOG"
+        
+        echo "🔍 Status do perfil rsyslog no AppArmor:"
+        aa-status | grep rsyslog || echo "ℹ️  Perfil rsyslog não listado no aa-status (pode ser normal)"
+        
+    else
+        echo "ℹ️  AppArmor não encontrado ou perfil do rsyslog não existe."
+        echo "ℹ️  Continuando sem configuração do AppArmor - rsyslog funcionará sem restrições adicionais."
+    fi
 }
 
 configurar_rsyslog() {
@@ -208,6 +242,7 @@ echo "🚀 Iniciando configuração completa..."
 instalar_pacotes
 baixar_aplicacao_zip        # ← PRIMEIRO: Baixa aplicação (com requirements.txt)
 criar_venv_instalar_dependencias  # ← DEPOIS: Instala dependências
+configurar_apparmor_rsyslog # ← Configura AppArmor apenas se existir
 configurar_rsyslog
 configurar_todos_crons
 criar_banco_dados
