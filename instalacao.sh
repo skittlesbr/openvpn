@@ -107,8 +107,34 @@ configurar_apparmor_rsyslog() {
         if grep -q "/syslog/.*rw" "$APPARMOR_RSYSLOG"; then
             echo "✅ Permissões do /syslog/ já estão configuradas no AppArmor."
         else
-            # Adiciona as permissões necessárias
-            sed -i '/\/var\/log\/\*\* rw,/a \  /syslog/ rw,\n  /syslog/** rw,' "$APPARMOR_RSYSLOG"
+            # ⭐ CORREÇÃO: Método mais robusto para adicionar permissões
+            echo "🔧 Adicionando permissões para /syslog/ no AppArmor..."
+            
+            # Método 1: Tenta encontrar um ponto de inserção comum
+            if grep -q "/var/log/.*rw" "$APPARMOR_RSYSLOG"; then
+                # Insere após permissões do /var/log/
+                sed -i '/\/var\/log\/\*\* rw,/a \  /syslog/ rw,\n  /syslog/** rw,' "$APPARMOR_RSYSLOG"
+            elif grep -q "^\s*/\*\* rw," "$APPARMOR_RSYSLOG"; then
+                # Insere após permissões globais
+                sed -i '/^\s*\/\*\* rw,/a \  /syslog/ rw,\n  /syslog/** rw,' "$APPARMOR_RSYSLOG"
+            else
+                # ⭐ MÉTODO ALTERNATIVO: Adiciona no final da seção de arquivos
+                # Encontra a última linha de permissões de arquivo
+                last_file_line=$(grep -n ".*rw," "$APPARMOR_RSYSLOG" | tail -1 | cut -d: -f1)
+                if [ -n "$last_file_line" ]; then
+                    # Insere após a última linha de permissões
+                    sed -i "${last_file_line}a \  /syslog/ rw,\n  /syslog/** rw," "$APPARMOR_RSYSLOG"
+                else
+                    # ⭐ MÉTODO DE FALLBACK: Adiciona antes do fechamento do profile
+                    if grep -q "^}" "$APPARMOR_RSYSLOG"; then
+                        sed -i '/^}/i \  /syslog/ rw,\n  /syslog/** rw,' "$APPARMOR_RSYSLOG"
+                    else
+                        # Último recurso: adiciona no final do arquivo
+                        echo "  /syslog/ rw," >> "$APPARMOR_RSYSLOG"
+                        echo "  /syslog/** rw," >> "$APPARMOR_RSYSLOG"
+                    fi
+                fi
+            fi
             echo "✅ Permissões adicionadas ao perfil do AppArmor."
         fi
         
@@ -116,18 +142,31 @@ configurar_apparmor_rsyslog() {
         echo "🔄 Recarregando perfil do AppArmor..."
         apparmor_parser -r "$APPARMOR_RSYSLOG"
         
-        echo "🔍 Status do perfil rsyslog no AppArmor:"
-        aa-status | grep rsyslog || echo "ℹ️  Perfil rsyslog não listado no aa-status (pode ser normal)"
+        # Verifica se foi carregado corretamente
+        if aa-status | grep -q "rsyslog"; then
+            echo "✅ Perfil rsyslog carregado com sucesso no AppArmor."
+        else
+            echo "⚠️  Perfil rsyslog não aparece no aa-status, mas pode estar funcionando."
+        fi
         
     else
         echo "ℹ️  AppArmor não encontrado ou perfil do rsyslog não existe."
-        echo "ℹ️  Continuando sem configuração do AppArmor - rsyslog funcionará sem restrições adicionais."
+        echo "ℹ️  Continuando sem configuração do AppArmor."
+        
+        # ⭐ GARANTE QUE O DIRETÓRIO /syslog EXISTE MESMO SEM APPARMOR
+        mkdir -p /syslog
+        chmod 755 /syslog
+        echo "✅ Diretório /syslog criado manualmente."
     fi
 }
 
 configurar_rsyslog() {
     echo "🛠️  Configurando rsyslog..."
+    
+    # ⭐ GARANTE QUE O DIRETÓRIO /syslog EXISTE ANTES DO RSYSLOG
     mkdir -p /syslog
+    chmod 755 /syslog
+    echo "✅ Diretório /syslog criado."
 
     cat <<EOF > "$RSYSLOG_CONF"
 # Carrega módulos necessários
@@ -157,6 +196,15 @@ EOF
     echo "🔄 Reiniciando rsyslog..."
     systemctl enable rsyslog
     systemctl restart rsyslog
+    
+    # ⭐ VERIFICA SE O RSYSLOG ESTÁ FUNCIONANDO
+    sleep 2
+    if systemctl is-active --quiet rsyslog; then
+        echo "✅ Rsyslog iniciado com sucesso."
+    else
+        echo "⚠️  Rsyslog pode ter problemas de inicialização."
+        systemctl status rsyslog --no-pager -l
+    fi
 }
 
 configurar_todos_crons() {
