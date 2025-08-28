@@ -93,7 +93,7 @@ criar_venv_instalar_dependencias() {
 }
 
 configurar_apparmor_rsyslog() {
-    echo "🛡️  Verificando AppArmor para rsyslog..."
+    echo "🛡️  Configurando AppArmor para rsyslog..."
     
     # Verifica se AppArmor está instalado e o perfil do rsyslog existe
     if command -v apparmor_parser >/dev/null 2>&1 && [ -f "$APPARMOR_RSYSLOG" ]; then
@@ -107,35 +107,29 @@ configurar_apparmor_rsyslog() {
         if grep -q "/syslog/.*rw" "$APPARMOR_RSYSLOG"; then
             echo "✅ Permissões do /syslog/ já estão configuradas no AppArmor."
         else
-            # ⭐ CORREÇÃO: Método mais robusto para adicionar permissões
             echo "🔧 Adicionando permissões para /syslog/ no AppArmor..."
             
-            # Método 1: Tenta encontrar um ponto de inserção comum
-            if grep -q "/var/log/.*rw" "$APPARMOR_RSYSLOG"; then
-                # Insere após permissões do /var/log/
-                sed -i '/\/var\/log\/\*\* rw,/a \  /syslog/ rw,\n  /syslog/** rw,' "$APPARMOR_RSYSLOG"
-            elif grep -q "^\s*/\*\* rw," "$APPARMOR_RSYSLOG"; then
-                # Insere após permissões globais
-                sed -i '/^\s*\/\*\* rw,/a \  /syslog/ rw,\n  /syslog/** rw,' "$APPARMOR_RSYSLOG"
+            # ⭐ MÉTODO INFALÍVEL: Usar um padrão de inserção mais amplo
+            # Procura por qualquer linha de permissão de arquivo para inserir após
+            if grep -q ".*rw.*" "$APPARMOR_RSYSLOG"; then
+                # Insere após a última linha de permissões de arquivo
+                last_rw_line=$(grep -n ".*rw.*" "$APPARMOR_RSYSLOG" | tail -1 | cut -d: -f1)
+                if [ -n "$last_rw_line" ]; then
+                    sed -i "${last_rw_line}a \  /syslog/ rw,\n  /syslog/** rw," "$APPARMOR_RSYSLOG"
+                    echo "✅ Permissões adicionadas após linha $last_rw_line"
+                fi
             else
-                # ⭐ MÉTODO ALTERNATIVO: Adiciona no final da seção de arquivos
-                # Encontra a última linha de permissões de arquivo
-                last_file_line=$(grep -n ".*rw," "$APPARMOR_RSYSLOG" | tail -1 | cut -d: -f1)
-                if [ -n "$last_file_line" ]; then
-                    # Insere após a última linha de permissões
-                    sed -i "${last_file_line}a \  /syslog/ rw,\n  /syslog/** rw," "$APPARMOR_RSYSLOG"
+                # ⭐ SE NÃO ENCONTRAR NENHUMA LINHA rw, INSERE ANTES DO FECHAMENTO
+                if grep -q "^}" "$APPARMOR_RSYSLOG"; then
+                    sed -i '/^}/i \  /syslog/ rw,\n  /syslog/** rw,' "$APPARMOR_RSYSLOG"
+                    echo "✅ Permissões adicionadas antes do fechamento do profile"
                 else
-                    # ⭐ MÉTODO DE FALLBACK: Adiciona antes do fechamento do profile
-                    if grep -q "^}" "$APPARMOR_RSYSLOG"; then
-                        sed -i '/^}/i \  /syslog/ rw,\n  /syslog/** rw,' "$APPARMOR_RSYSLOG"
-                    else
-                        # Último recurso: adiciona no final do arquivo
-                        echo "  /syslog/ rw," >> "$APPARMOR_RSYSLOG"
-                        echo "  /syslog/** rw," >> "$APPARMOR_RSYSLOG"
-                    fi
+                    # Último recurso: adiciona no final do arquivo
+                    echo "  /syslog/ rw," >> "$APPARMOR_RSYSLOG"
+                    echo "  /syslog/** rw," >> "$APPARMOR_RSYSLOG"
+                    echo "✅ Permissões adicionadas no final do arquivo"
                 fi
             fi
-            echo "✅ Permissões adicionadas ao perfil do AppArmor."
         fi
         
         # Recarrega o perfil do AppArmor
@@ -152,12 +146,14 @@ configurar_apparmor_rsyslog() {
     else
         echo "ℹ️  AppArmor não encontrado ou perfil do rsyslog não existe."
         echo "ℹ️  Continuando sem configuração do AppArmor."
-        
-        # ⭐ GARANTE QUE O DIRETÓRIO /syslog EXISTE MESMO SEM APPARMOR
-        mkdir -p /syslog
-        chmod 755 /syslog
-        echo "✅ Diretório /syslog criado manualmente."
     fi
+    
+    # ⭐ GARANTIR QUE O DIRETÓRIO /syslog EXISTE E TEM PERMISSÕES CORRETAS
+    echo "📁 Garantindo que o diretório /syslog existe..."
+    mkdir -p /syslog
+    chmod 755 /syslog
+    chown syslog:syslog /syslog  # ⭐ IMPORTANTE: ownership correto
+    echo "✅ Diretório /syslog configurado com permissões corretas"
 }
 
 configurar_rsyslog() {
