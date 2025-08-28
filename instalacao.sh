@@ -283,6 +283,26 @@ EOF
     echo "✅ Serviço Relatorio Web iniciado e habilitado como 'relatorio_vpn.service'"
 }
 
+importar_log_apagar_relatorio() {
+    echo "🗄️  Importando Log Teste para o banco de dados..."
+    
+    # Verifica se o arquivo create_db.py existe
+    if [ ! -f "$APP_DIR/importa_logs.py" ]; then
+        echo "⚠️  Arquivo $APP_DIR/importa_logs.py não encontrado. Pulando importação Log Teste para o banco de dados."
+        return
+    fi
+    
+    # Executa o script importação de Log Teste para o banco de dados usando o Python do venv
+    if "$VENV_DIR/bin/python3" "$APP_DIR/importa_logs.py"; then
+        echo "✅ Importação feita com sucesso."
+    else
+        echo "❌ Erro ao criar banco de dados."
+        exit 1
+    fi
+
+    echo > "$APP_DIR/relatorio"
+}
+
 # === EXECUÇÃO ===
 
 echo "🚀 Iniciando configuração completa..."
@@ -294,5 +314,6 @@ configurar_rsyslog
 configurar_todos_crons
 criar_banco_dados
 criar_servico_systemd
+importar_log_apagar_relatorio
 
 echo "✅ Tudo pronto!"
