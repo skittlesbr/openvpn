@@ -230,6 +230,9 @@ configurar_todos_crons() {
     
     echo "🔍 Crontab final:"
     crontab -l 2>/dev/null | cat -n
+
+    # Dar permissão de execução no script
+    chmod +x "$SCRIPT_LOG"
 }
 
 criar_banco_dados() {
